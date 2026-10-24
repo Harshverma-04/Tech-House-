@@ -125,6 +125,7 @@ a{color:inherit}
     <strong id="pName" style="color:#fff;display:block;margin-bottom:2px;">Not Signed In</strong>
     <span id="pEmail" style="font-size:11px;display:block;word-break:break-all;">Sign in to view details</span>
     <span id="pBranchSem" style="font-size:11px;display:block;margin-top:4px;color:var(--cyan);"></span>
+    <button class="btn secondary" id="editProfileBtn" style="width:100%;margin-top:8px;font-size:11px;padding:6px;display:none;">Edit Profile / Name</button>
   </div>
   <div class="side-label">Study library</div>
   <button class="sideitem" data-nav="library">▣ &nbsp; Polytechnic</button>
@@ -171,12 +172,16 @@ a{color:inherit}
     </section>
   </section>
 
-  <!-- Syllabus 4x4 Section -->
+  <!-- Syllabus Section with Branch Folders and 3 Years -->
   <section id="syllabusSection" style="margin-top:35px;">
     <div class="sectionhead">
-      <div><h2>Branch Syllabus (PDF Links)</h2><p>Branch-wise syllabus divided into 1st, 2nd, and 3rd Year folders</p></div>
+      <div><h2>Branch Syllabus (PDF Links)</h2><p>Click on a branch to view 1st, 2nd, and 3rd Year folders</p></div>
     </div>
-    <div class="syllabus-grid" id="syllabusGrid"></div>
+    <div class="branches" id="syllabusBranches"></div>
+    <section class="contentpanel" id="syllabusContentPanel">
+      <h3>Choose a branch above</h3>
+      <p class="muted">Select any branch to view 1st Year, 2nd Year, and 3rd Year PDF folders.</p>
+    </section>
   </section>
 
   <!-- Latest Semesters Exam Section -->
@@ -212,7 +217,7 @@ a{color:inherit}
         </select>
       </div>
       <div id="subDiv">
-        <label class="formlabel" for="fSub" id="subLabel">Semester</label>
+        <label class="formlabel" for="fSub" id="subLabel">Semester / Year</label>
         <select class="field" id="fSub">
           <option value="1">1st Semester</option>
           <option value="2">2nd Semester</option>
@@ -266,6 +271,41 @@ a{color:inherit}
 </main>
 </div>
 
+<!-- Profile Edit Modal -->
+<div class="modal" id="profileModal" role="dialog" aria-modal="true">
+  <div class="modalcard">
+    <div class="modalhead"><h2>Edit Profile</h2><button class="close" id="closeProfileModal">Close ✕</button></div>
+    <form id="profileForm" style="margin-top:15px;display:grid;gap:12px;">
+      <div>
+        <label class="formlabel" for="editName">Your Name</label>
+        <input class="field" id="editName" required placeholder="Enter your name">
+      </div>
+      <div>
+        <label class="formlabel" for="editBranch">Your Branch</label>
+        <select class="field" id="editBranch">
+          <option value="CSE">CSE</option>
+          <option value="Electrical">Electrical</option>
+          <option value="Mechanical">Mechanical</option>
+          <option value="Civil">Civil</option>
+          <option value="Electronics">Electronics</option>
+        </select>
+      </div>
+      <div>
+        <label class="formlabel" for="editSem">Your Semester / Year</label>
+        <select class="field" id="editSem">
+          <option value="1st Semester">1st Semester</option>
+          <option value="2nd Semester">2nd Semester</option>
+          <option value="3rd Semester">3rd Semester</option>
+          <option value="4th Semester">4th Semester</option>
+          <option value="5th Semester">5th Semester</option>
+          <option value="6th Semester">6th Semester</option>
+        </select>
+      </div>
+      <button class="btn primary" type="submit">Save Profile</button>
+    </form>
+  </div>
+</div>
+
 <div class="modal" id="modal" role="dialog" aria-modal="true">
   <div class="modalcard">
     <div class="modalhead"><h2 id="modalTitle">About</h2><button class="close" id="closeModal">Close ✕</button></div>
@@ -276,7 +316,9 @@ a{color:inherit}
 
 <script>
 const branchesData=[{id:"cse",name:"CSE",full:"Computer Science & Engineering",icon:"⌘"},{id:"electrical",name:"Electrical",full:"Electrical Engineering",icon:"ϟ"},{id:"mechanical",name:"Mechanical",full:"Mechanical Engineering",icon:"⚙"},{id:"civil",name:"Civil",full:"Civil Engineering",icon:"⌂"},{id:"electronics",name:"Electronics",full:"Electronics Engineering",icon:"▤"}],semesters=["1st Semester","2nd Semester","3rd Semester","4th Semester","5th Semester","6th Semester"];
-let resources=[],selected=null,user=null,auth=null,db=null,firebaseReady=false;const ADMIN_EMAIL="harshverma251309@gmail.com";
+let resources=[],selected=null,selectedSyllabusBranch=null,user=null,auth=null,db=null,firebaseReady=false;const ADMIN_EMAIL="harshverma251309@gmail.com";
+let userProfile={name:"",branch:"CSE",sem:"1st Semester"};
+
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function toast(s){$("toast").textContent=s;$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",3600)}
 
@@ -293,7 +335,6 @@ function renderMaterial(){
 
   let html=`<h3>${b.name} · ${semesters[selected.semester-1]}</h3><p class="muted">Expand folders below to view or manage subject links.</p><div class="materialtabs">`;
   
-  // YouTube Lectures Tab
   html+=`<div class="material video"><div class="micon">▶️</div><h4>YouTube Lectures</h4><p>6 Subject Folders</p>`;
   for(let i=1; i<=6; i++){
     const folderItems=items.filter(r=>r.type==="lecture"&&Number(r.folderIdx||1)===i);
@@ -314,7 +355,6 @@ function renderMaterial(){
   }
   html+=`</div>`;
 
-  // Notes PDF Tab
   html+=`<div class="material notes"><div class="micon">📘</div><h4>Notes — Google Drive</h4><p>6 Subject Folders</p>`;
   for(let i=1; i<=6; i++){
     const folderItems=items.filter(r=>r.type==="notes"&&Number(r.folderIdx||1)===i);
@@ -343,14 +383,65 @@ function toggleFolder(id){
   if(el) el.classList.toggle("open");
 }
 
-function renderSyllabus(){const g=$("syllabusGrid");g.innerHTML="";branchesData.forEach(b=>{const box=document.createElement("div");box.className="syllabus-box";box.innerHTML=`<h4>${b.name} Syllabus</h4>`;["1st Year", "2nd Year", "3rd Year"].forEach((yr, idx)=>{const fDiv=document.createElement("div");fDiv.className="year-folder";fDiv.innerHTML=`<strong>${yr}</strong>`;const listDiv=document.createElement("div");listDiv.className="linklist";const filtered=resources.filter(r=>r.category==="syllabus"&&r.branch===b.id&&Number(r.semester)===idx+1);if(!filtered.length){listDiv.innerHTML='<div class="empty" style="padding:4px;font-size:11px;">No PDF added</div>'}else{filtered.forEach(r=>{const row=document.createElement("div");row.className="linkrow";row.style.padding="6px 8px";row.innerHTML=`<strong style="font-size:11px;">${esc(r.title)}</strong><a href="${esc(r.url)}" target="_blank" style="font-size:11px;">PDF ↗</a>`;listDiv.appendChild(row)})}fDiv.appendChild(listDiv);box.appendChild(fDiv)});g.appendChild(box)})}
+function renderSyllabusBranches(){
+  const sBranch=$("syllabusBranches");
+  sBranch.innerHTML="";
+  branchesData.forEach(b=>{
+    const el=document.createElement("article");
+    el.className="branch"+(selectedSyllabusBranch===b.id?" open":"");
+    const h=document.createElement("button");
+    h.className="branchhead";
+    h.innerHTML=`<span class="branchicon">${b.icon}</span><span class="branchname"><strong>${b.name}</strong><small>${b.full}</small></span><span class="chev">›</span>`;
+    h.onclick=()=>{
+      selectedSyllabusBranch=selectedSyllabusBranch===b.id?null:b.id;
+      renderSyllabusBranches();
+      renderSyllabusContent();
+    };
+    el.append(h);
+    sBranch.appendChild(el);
+  });
+}
+
+function renderSyllabusContent(){
+  const panel=$("syllabusContentPanel");
+  if(!selectedSyllabusBranch){
+    panel.innerHTML='<h3>Choose a branch above</h3><p class="muted">Select any branch to view 1st Year, 2nd Year, and 3rd Year PDF folders.</p>';
+    return;
+  }
+  const b=branchesData.find(x=>x.id===selectedSyllabusBranch);
+  let html=`<h3>${b.name} · Syllabus Years</h3><p class="muted">Click year folders below to access PDF syllabus links.</p>`;
+  
+  ["1st Year", "2nd Year", "3rd Year"].forEach((yr, idx)=>{
+    const yearNum=idx+1;
+    const filtered=resources.filter(r=>r.category==="syllabus"&&r.branch===b.id&&Number(r.semester)===yearNum);
+    html+=`<div class="subject-folder" id="syllabusYr_${yearNum}">
+      <div class="subject-folder-head" onclick="toggleFolder('syllabusYr_${yearNum}')">
+        <strong>📁 ${yr} Syllabus</strong>
+        <span style="font-size:11px;color:var(--cyan);">${filtered.length} PDFs ▾</span>
+      </div>
+      <div class="subject-links">`;
+    if(!filtered.length){
+      html+=`<div class="empty">No PDF syllabus added in ${yr} yet.</div>`;
+    }else{
+      filtered.forEach(r=>{
+        html+=`<div class="linkrow"><strong>${esc(r.title)}</strong><a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">PDF ↗</a></div>`;
+      });
+    }
+    html+=`</div></div>`;
+  });
+  panel.innerHTML=html;
+}
 
 function renderExams(){const g=$("examsGrid");g.innerHTML="";branchesData.forEach(b=>{const box=document.createElement("div");box.className="syllabus-box";box.innerHTML=`<h4>${b.name} Exams</h4>`;semesters.forEach((semName, idx)=>{const fDiv=document.createElement("div");fDiv.className="year-folder";fDiv.innerHTML=`<strong>${semName}</strong>`;const listDiv=document.createElement("div");listDiv.className="linklist";const filtered=resources.filter(r=>r.category==="exam"&&r.branch===b.id&&Number(r.semester)===idx+1);if(!filtered.length){listDiv.innerHTML='<div class="empty" style="padding:4px;font-size:11px;">No exam paper</div>'}else{filtered.forEach(r=>{const row=document.createElement("div");row.className="linkrow";row.style.padding="6px 8px";row.innerHTML=`<strong style="font-size:11px;">${esc(r.title)}</strong><a href="${esc(r.url)}" target="_blank" style="font-size:11px;">Paper ↗</a>`;listDiv.appendChild(row)})}fDiv.appendChild(listDiv);box.appendChild(fDiv)});g.appendChild(box)})}
 
 function renderNotifications(){const nArea=$("notificationArea");nArea.innerHTML="";const activeNotifs=resources.filter(r=>r.category==="notification");if(activeNotifs.length){let html="";activeNotifs.forEach(n=>{html+=`<div class="notification-banner"><div class="notif-icon">🔔</div><div class="notif-content"><strong>Owner Announcement</strong><p>${esc(n.title)}</p></div></div>`;});nArea.innerHTML=html;}}
 
-$("search").addEventListener("input",renderBranches);$("year").textContent=new Date().getFullYear();renderBranches();
+$("search").addEventListener("input",renderBranches);$("year").textContent=new Date().getFullYear();renderBranches();renderSyllabusBranches();
 const sidebar=$("sidebar");$("menuBtn").onclick=()=>sidebar.classList.toggle("open");document.addEventListener("click",e=>{if(innerWidth<=680&&sidebar.classList.contains("open")&&!sidebar.contains(e.target)&&e.target.id!=="menuBtn")sidebar.classList.remove("open")});$("exploreBtn").onclick=()=>$("library").scrollIntoView({behavior:"smooth"});$("googleHero").onclick=login;$("loginBtn").onclick=login;$("sideLogin").onclick=()=>user?logout():login();$("adminNav").onclick=()=>{$("adminPanel").scrollIntoView({behavior:"smooth"});if(!isAdmin())toast("Admin panel sirf owner Gmail ke liye hai.")};
+
+$("editProfileBtn").onclick=()=>{$("editName").value=userProfile.name;$("editBranch").value=userProfile.branch;$("editSem").value=userProfile.sem;$("profileModal").classList.add("show")};
+$("closeProfileModal").onclick=()=>$("profileModal").classList.remove("show");
+$("profileForm").onsubmit=e=>{e.preventDefault();userProfile.name=$("editName").value.trim();userProfile.branch=$("editBranch").value;userProfile.sem=$("editSem").value;updateAuth();$("profileModal").classList.remove("show");toast("Profile updated successfully!");};
 
 document.querySelectorAll("[data-branch]").forEach(b=>b.onclick=()=>{selected={branch:b.dataset.branch,semester:null};$("search").value="";renderBranches();renderMaterial();$("library").scrollIntoView({behavior:"smooth"});sidebar.classList.remove("open")});
 document.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>{
@@ -387,22 +478,25 @@ function updateAuth(){
   $("adminPanel").classList.toggle("hidden",!isAdmin());
   
   if(user){
-    $("pName").textContent=user.displayName||"Student / User";
+    if(!userProfile.name) userProfile.name=user.displayName||"Student / User";
+    $("pName").textContent=userProfile.name;
     $("pEmail").textContent=user.email;
-    $("pBranchSem").textContent=isAdmin()?"Role: Owner (Admin)":"Role: Student";
+    $("pBranchSem").textContent=isAdmin()?"Role: Owner (Admin)":`${userProfile.branch} · ${userProfile.sem}`;
+    $("editProfileBtn").style.display="block";
   }else{
     $("pName").textContent="Not Signed In";
-    $("pEmail").textContent="Sign in with Google";
+    $("pEmail").textContent="Sign in to view details";
     $("pBranchSem").textContent="";
+    $("editProfileBtn").style.display="none";
   }
 }
 
 async function login(){if(!firebaseReady){toast("Google login setup pending. Check README.");return}try{const {GoogleAuthProvider,signInWithPopup}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");await signInWithPopup(auth,new GoogleAuthProvider())}catch(e){toast("Login error: "+e.message)}}
 async function logout(){if(auth){const {signOut}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");await signOut(auth)}}
 
-async function setupFirebase(){try{const response=await fetch("firebase-config.json");if(!response.ok)return;const cfg=await response.json();if(!cfg.apiKey||String(cfg.apiKey).startsWith("PASTE_"))return;const amod=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"),authmod=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"),app=amod.initializeApp(cfg);auth=authmod.getAuth(app);await authmod.setPersistence(auth,authmod.browserLocalPersistence);const fm=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");db=fm.getFirestore(app);firebaseReady=true;authmod.onAuthStateChanged(authmod.getAuth(app),async u=>{user=u;updateAuth();await loadResources()});$("adminMessage").textContent="Firebase connected successfully."}catch(e){console.warn("Firebase not configured",e)}}
+async function setupFirebase(){try{const response=await fetch("firebase-config.json");if(!response.ok)return;const cfg=await response.json();if(!cfg.apiKey||String(cfg.apiKey).startsWith("PASTE_"))return;const amod=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"),authmod=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"),app=amod.initializeApp(cfg);auth=authmod.getAuth(app);await authmod.setPersistence(auth,authmod.browserLocalPersistence);const fm=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");db=fm.getFirestore(app);firebaseReady=true;authmod.onAuthStateChanged(authmod.getAuth(app),async u=>{user=u;updateAuth();await loadResources()});$("adminMessage").textContent="Firebase connected successfully. Owner recognized: "+ADMIN_EMAIL;}catch(e){console.warn("Firebase not configured",e)}}
 
-async function loadResources(){if(!firebaseReady)return;try{const {collection,getDocs}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"),snap=await getDocs(collection(db,"resources"));resources=snap.docs.map(d=>d.data());renderMaterial();renderSyllabus();renderExams();renderNotifications()}catch(e){toast("Failed to load records from Firestore.")}}
+async function loadResources(){if(!firebaseReady)return;try{const {collection,getDocs}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"),snap=await getDocs(collection(db,"resources"));resources=snap.docs.map(d=>d.data());renderMaterial();renderSyllabusContent();renderExams();renderNotifications()}catch(e){toast("Failed to load records from Firestore.")}}
 
 $("resourceForm").addEventListener("submit",async e=>{e.preventDefault();if(!isAdmin()){toast("Sirf owner hi content add kar sakta hai.");return}if(!firebaseReady){toast("Pehle Firebase configure karo.");return}
 const category=$("fCategory").value,title=$("fTitle").value.trim(),url=$("fUrl").value.trim();
@@ -410,7 +504,7 @@ let branch="",semester=1,type="notes",folderIdx=1;
 if(category!=="notification"){branch=$("fBranch").value;semester=Number($("fSub").value);}
 if(category==="resource"){type=$("fType").value;folderIdx=Number($("fFolderIdx").value);}
 
-try{const {collection,addDoc,serverTimestamp}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");await addDoc(collection(db,"resources"),{category,branch,semester,type,folderIdx,title,url,createdAt:serverTimestamp(),createdBy:user.email});resources.push({category,branch,semester,type,folderIdx,title,url});renderMaterial();renderSyllabus();renderExams();renderNotifications();e.target.reset();toast("Successfully published!")}catch(err){toast("Publishing failed. Check Firestore rules.")}});setupFirebase();
+try{const {collection,addDoc,serverTimestamp}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");await addDoc(collection(db,"resources"),{category,branch,semester,type,folderIdx,title,url,createdAt:serverTimestamp(),createdBy:user.email});resources.push({category,branch,semester,type,folderIdx,title,url});renderMaterial();renderSyllabusContent();renderExams();renderNotifications();e.target.reset();toast("Successfully published!")}catch(err){toast("Publishing failed. Check Firestore rules.")}});setupFirebase();
 </script>
 </body>
 </html>
