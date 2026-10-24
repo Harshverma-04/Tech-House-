@@ -4,16 +4,11 @@ service cloud.firestore {
     function isSiteAdmin() {
       return request.auth != null
         && request.auth.token.email != null
-        && request.auth.token.email.toLowerCase().trim() == "harshverma251309@gmail.com";
+        && request.auth.token.email == "harshverma251309@gmail.com";
     }
     match /resources/{resourceId} {
       allow read: if true;
       allow create, update, delete: if isSiteAdmin();
-    }
-    match /doubts/{doubtId} {
-      allow read: if true;
-      allow create: if request.auth != null;
-      allow update, delete: if isSiteAdmin();
     }
   }
 }

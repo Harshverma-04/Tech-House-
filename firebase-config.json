@@ -2,5 +2,7 @@
   "apiKey": "AIzaSyCq_T7QwXrVWOs_5oGpJ1AFOZ2ebjBEMsQ",
   "authDomain": "polynest-study-hub.firebaseapp.com",
   "projectId": "polynest-study-hub",
+  "storageBucket": "polynest-study-hub.firebasestorage.app",
+  "messagingSenderId": "19980516727",
   "appId": "1:19980516727:web:c92e66df304a900de73572"
 }
