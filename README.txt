@@ -1,8 +1,7 @@
-POLYNEST HUB — Complete Final Version
+POLYNEST HUB — Ultimate Final Release
 
-UPDATES INCLUDED:
-1. Owner Email configured: harshverma251309@gmail.com for full Admin access.
-2. User Profile edit modal added so any logged-in student can update their name, branch, and semester to view in the menu.
-3. Syllabus section now features branch selection opening 1st, 2nd, and 3rd Year folders.
-4. 6 Subject folders for both Video Lectures and Notes under every semester.
-5. Live notification banner & Exam papers section.
+FIXES & NEW FEATURES:
+1. Google Login Error Fix: Added clear instruction and alert when firebase-config.json needs to be configured.
+2. User Profile & Details: Every user (owner or student) has their name, branch, and semester displayed in the sidebar profile box, with an "Edit Profile / Name" button.
+3. Owner Authentication & Admin Panel: Only harshverma251309@gmail.com has access to the admin panel to add links, exam papers, syllabus, and notification announcements.
+4. Student Doubt & Request Box: Students can post notes/video requests with their name, branch, and semester which show up in a live community doubts list.

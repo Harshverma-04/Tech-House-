@@ -10,7 +10,7 @@
 :root{--bg:#06101f;--panel:#0c1d33;--line:#233c59;--txt:#edf5ff;--muted:#9db1ca;--cyan:#72e0d0;--blue:#388bff;--gold:#ffc45b}
 *{box-sizing:border-box}
 body{margin:0;background:radial-gradient(900px 480px at 75% -8%,#173d70 0,transparent 62%),radial-gradient(700px 480px at 5% 25%,#103d4a 0,transparent 65%),var(--bg);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;color:var(--txt)}
-button,input,select{font:inherit}
+button,input,select,textarea{font:inherit}
 button,a{cursor:pointer}
 a{color:inherit}
 .top{height:70px;display:flex;align-items:center;gap:14px;padding:0 20px;border-bottom:1px solid #1b3450;background:#071426ee;position:sticky;top:0;z-index:10;backdrop-filter:blur(14px)}
@@ -134,8 +134,9 @@ a{color:inherit}
   <button class="sideitem sidebranch" data-branch="mechanical">⚙ &nbsp; Mechanical</button>
   <button class="sideitem sidebranch" data-branch="civil">⌂ &nbsp; Civil</button>
   <button class="sideitem sidebranch" data-branch="electronics">▤ &nbsp; Electronics</button>
-  <button class="sideitem" data-nav="syllabus">📋 &nbsp; Syllabus (4×4)</button>
+  <button class="sideitem" data-nav="syllabus">📋 &nbsp; Syllabus (Branch Folders)</button>
   <button class="sideitem" data-nav="exams">📁 &nbsp; Latest Semesters Exam</button>
+  <button class="sideitem" data-nav="doubt">💬 &nbsp; Student Doubt & Request Box</button>
   <div class="side-label">Account & Admin</div>
   <button class="sideitem" id="sideLogin">↗ &nbsp; Login / Logout</button>
   <button class="sideitem" id="adminNav">♙ &nbsp; Admin Panel</button>
@@ -190,6 +191,33 @@ a{color:inherit}
       <div><h2>Latest Semesters Exam Papers</h2><p>Branch-wise folders containing up to 6th Semester exam links</p></div>
     </div>
     <div class="syllabus-grid" id="examsGrid"></div>
+  </section>
+
+  <!-- Student Doubt / Request Box Section -->
+  <section id="doubtSection" style="margin-top:35px;">
+    <div class="sectionhead">
+      <div><h2>Student Doubt & Request Box</h2><p>Students can post doubts or request specific study notes/videos here</p></div>
+    </div>
+    <div class="contentpanel">
+      <h3>Post Your Request / Doubt</h3>
+      <form id="doubtForm" style="display:grid;gap:12px;margin-top:12px;">
+        <div>
+          <label class="formlabel" for="doubtTitle">Topic / Subject / Title</label>
+          <input class="field" id="doubtTitle" required placeholder="e.g. Need C++ Programming Notes or 4th Sem Hydraulics Video">
+        </div>
+        <div>
+          <label class="formlabel" for="doubtMsg">Detailed Request / Message</label>
+          <textarea class="field" id="doubtMsg" rows="3" required placeholder="Describe what notes, video or help you need..."></textarea>
+        </div>
+        <div>
+          <button class="btn primary" type="submit">Submit Doubt / Request</button>
+        </div>
+      </form>
+      <h3 style="margin-top:25px;">Recent Student Requests & Doubts</h3>
+      <div id="doubtList" style="display:grid;gap:10px;margin-top:12px;">
+        <div class="empty">Loading student requests...</div>
+      </div>
+    </div>
   </section>
 
   <!-- Admin Panel -->
@@ -316,16 +344,44 @@ a{color:inherit}
 
 <script>
 const branchesData=[{id:"cse",name:"CSE",full:"Computer Science & Engineering",icon:"⌘"},{id:"electrical",name:"Electrical",full:"Electrical Engineering",icon:"ϟ"},{id:"mechanical",name:"Mechanical",full:"Mechanical Engineering",icon:"⚙"},{id:"civil",name:"Civil",full:"Civil Engineering",icon:"⌂"},{id:"electronics",name:"Electronics",full:"Electronics Engineering",icon:"▤"}],semesters=["1st Semester","2nd Semester","3rd Semester","4th Semester","5th Semester","6th Semester"];
-let resources=[],selected=null,selectedSyllabusBranch=null,user=null,auth=null,db=null,firebaseReady=false;const ADMIN_EMAIL="harshverma251309@gmail.com";
+let resources=[],doubts=[],selected=null,selectedSyllabusBranch=null,user=null,auth=null,db=null,firebaseReady=false;
+const ADMIN_EMAIL="harshverma251309@gmail.com";
 let userProfile={name:"",branch:"CSE",sem:"1st Semester"};
 
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function toast(s){$("toast").textContent=s;$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",3600)}
 
-function renderBranches(){const q=$("search").value.trim().toLowerCase(),arr=branchesData.filter(b=>(b.name+" "+b.full).toLowerCase().includes(q));$("branchCount").textContent=arr.length+" branches";$("branches").innerHTML="";if(!arr.length){$("branches").innerHTML='<div class="empty">No branch found. Try CSE, Electrical, Mechanical, Civil or Electronics.</div>';return}arr.forEach(b=>{const el=document.createElement("article");el.className="branch"+(selected&&selected.branch===b.id?" open":"");const h=document.createElement("button");h.className="branchhead";h.innerHTML=`<span class="branchicon">${b.icon}</span><span class="branchname"><strong>${b.name}</strong><small>${b.full}</small></span><span class="chev">›</span>`;h.onclick=()=>{selected=selected&&selected.branch===b.id?null:{branch:b.id,semester:null};renderBranches();renderMaterial()};const ss=document.createElement("div");ss.className="sems";semesters.forEach((s,i)=>{const btn=document.createElement("button");btn.className="sem"+(selected&&selected.branch===b.id&&selected.semester===i+1?" active":"");btn.innerHTML=`${s}<small>Open folder ↗</small>`;btn.onclick=()=>{selected={branch:b.id,semester:i+1};renderBranches();renderMaterial();$("materialPanel").scrollIntoView({behavior:"smooth",block:"nearest"})};ss.appendChild(btn)});el.append(h,ss);$("branches").appendChild(el)})}
+function renderBranches(){
+  const q=$("search").value.trim().toLowerCase(),arr=branchesData.filter(b=>(b.name+" "+b.full).toLowerCase().includes(q));
+  $("branchCount").textContent=arr.length+" branches";
+  const bContainer=$("branches");
+  if(!bContainer) return;
+  bContainer.innerHTML="";
+  if(!arr.length){bContainer.innerHTML='<div class="empty">No branch found. Try CSE, Electrical, Mechanical, Civil or Electronics.</div>';return}
+  arr.forEach(b=>{
+    const el=document.createElement("article");
+    el.className="branch"+(selected&&selected.branch===b.id?" open":"");
+    const h=document.createElement("button");
+    h.className="branchhead";
+    h.innerHTML=`<span class="branchicon">${b.icon}</span><span class="branchname"><strong>${b.name}</strong><small>${b.full}</small></span><span class="chev">›</span>`;
+    h.onclick=()=>{selected=selected&&selected.branch===b.id?null:{branch:b.id,semester:null};renderBranches();renderMaterial()};
+    const ss=document.createElement("div");
+    ss.className="sems";
+    semesters.forEach((s,i)=>{
+      const btn=document.createElement("button");
+      btn.className="sem"+(selected&&selected.branch===b.id&&selected.semester===i+1?" active":"");
+      btn.innerHTML=`${s}<small>Open folder ↗</small>`;
+      btn.onclick=()=>{selected={branch:b.id,semester:i+1};renderBranches();renderMaterial();$("materialPanel").scrollIntoView({behavior:"smooth",block:"nearest"})};
+      ss.appendChild(btn);
+    });
+    el.append(h,ss);
+    bContainer.appendChild(el);
+  });
+}
 
 function renderMaterial(){
   const p=$("materialPanel");
+  if(!p) return;
   if(!selected||!selected.semester){
     p.innerHTML='<h3>Choose a branch and semester</h3><p class="muted">Each semester contains 6 Video Subject Folders and 6 PDF Notes Subject Folders.</p>';
     return;
@@ -385,6 +441,7 @@ function toggleFolder(id){
 
 function renderSyllabusBranches(){
   const sBranch=$("syllabusBranches");
+  if(!sBranch) return;
   sBranch.innerHTML="";
   branchesData.forEach(b=>{
     const el=document.createElement("article");
@@ -404,6 +461,7 @@ function renderSyllabusBranches(){
 
 function renderSyllabusContent(){
   const panel=$("syllabusContentPanel");
+  if(!panel) return;
   if(!selectedSyllabusBranch){
     panel.innerHTML='<h3>Choose a branch above</h3><p class="muted">Select any branch to view 1st Year, 2nd Year, and 3rd Year PDF folders.</p>';
     return;
@@ -432,50 +490,177 @@ function renderSyllabusContent(){
   panel.innerHTML=html;
 }
 
-function renderExams(){const g=$("examsGrid");g.innerHTML="";branchesData.forEach(b=>{const box=document.createElement("div");box.className="syllabus-box";box.innerHTML=`<h4>${b.name} Exams</h4>`;semesters.forEach((semName, idx)=>{const fDiv=document.createElement("div");fDiv.className="year-folder";fDiv.innerHTML=`<strong>${semName}</strong>`;const listDiv=document.createElement("div");listDiv.className="linklist";const filtered=resources.filter(r=>r.category==="exam"&&r.branch===b.id&&Number(r.semester)===idx+1);if(!filtered.length){listDiv.innerHTML='<div class="empty" style="padding:4px;font-size:11px;">No exam paper</div>'}else{filtered.forEach(r=>{const row=document.createElement("div");row.className="linkrow";row.style.padding="6px 8px";row.innerHTML=`<strong style="font-size:11px;">${esc(r.title)}</strong><a href="${esc(r.url)}" target="_blank" style="font-size:11px;">Paper ↗</a>`;listDiv.appendChild(row)})}fDiv.appendChild(listDiv);box.appendChild(fDiv)});g.appendChild(box)})}
+function renderExams(){
+  const g=$("examsGrid");
+  if(!g) return;
+  g.innerHTML="";
+  branchesData.forEach(b=>{
+    const box=document.createElement("div");
+    box.className="syllabus-box";
+    box.innerHTML=`<h4>${b.name} Exams</h4>`;
+    semesters.forEach((semName, idx)=>{
+      const fDiv=document.createElement("div");
+      fDiv.className="year-folder";
+      fDiv.innerHTML=`<strong>${semName}</strong>`;
+      const listDiv=document.createElement("div");
+      listDiv.className="linklist";
+      const filtered=resources.filter(r=>r.category==="exam"&&r.branch===b.id&&Number(r.semester)===idx+1);
+      if(!filtered.length){
+        listDiv.innerHTML='<div class="empty" style="padding:4px;font-size:11px;">No exam paper</div>';
+      }else{
+        filtered.forEach(r=>{
+          const row=document.createElement("div");
+          row.className="linkrow";
+          row.style.padding="6px 8px";
+          row.innerHTML=`<strong style="font-size:11px;">${esc(r.title)}</strong><a href="${esc(r.url)}" target="_blank" style="font-size:11px;">Paper ↗</a>`;
+          listDiv.appendChild(row);
+        });
+      }
+      fDiv.appendChild(listDiv);
+      box.appendChild(fDiv);
+    });
+    g.appendChild(box);
+  });
+}
 
-function renderNotifications(){const nArea=$("notificationArea");nArea.innerHTML="";const activeNotifs=resources.filter(r=>r.category==="notification");if(activeNotifs.length){let html="";activeNotifs.forEach(n=>{html+=`<div class="notification-banner"><div class="notif-icon">🔔</div><div class="notif-content"><strong>Owner Announcement</strong><p>${esc(n.title)}</p></div></div>`;});nArea.innerHTML=html;}}
+function renderNotifications(){
+  const nArea=$("notificationArea");
+  if(!nArea) return;
+  nArea.innerHTML="";
+  const activeNotifs=resources.filter(r=>r.category==="notification");
+  if(activeNotifs.length){
+    let html="";
+    activeNotifs.forEach(n=>{
+      html+=`<div class="notification-banner"><div class="notif-icon">🔔</div><div class="notif-content"><strong>Owner Announcement</strong><p>${esc(n.title)}</p></div></div>`;
+    });
+    nArea.innerHTML=html;
+  }
+}
 
-$("search").addEventListener("input",renderBranches);$("year").textContent=new Date().getFullYear();renderBranches();renderSyllabusBranches();
-const sidebar=$("sidebar");$("menuBtn").onclick=()=>sidebar.classList.toggle("open");document.addEventListener("click",e=>{if(innerWidth<=680&&sidebar.classList.contains("open")&&!sidebar.contains(e.target)&&e.target.id!=="menuBtn")sidebar.classList.remove("open")});$("exploreBtn").onclick=()=>$("library").scrollIntoView({behavior:"smooth"});$("googleHero").onclick=login;$("loginBtn").onclick=login;$("sideLogin").onclick=()=>user?logout():login();$("adminNav").onclick=()=>{$("adminPanel").scrollIntoView({behavior:"smooth"});if(!isAdmin())toast("Admin panel sirf owner Gmail ke liye hai.")};
+function renderDoubts(){
+  const dList=$("doubtList");
+  if(!dList) return;
+  if(!doubts.length){
+    dList.innerHTML='<div class="empty">No doubts or requests posted yet. Be the first to ask!</div>';
+    return;
+  }
+  let html="";
+  doubts.forEach(d=>{
+    html+=`<div class="linkrow" style="display:block;padding:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <strong style="font-size:14px;color:var(--cyan);">${esc(d.title)}</strong>
+        <span style="font-size:11px;color:var(--muted);">By: ${esc(d.authorName)} (${esc(d.authorBranch)} - ${esc(d.authorSem)})</span>
+      </div>
+      <p style="margin:4px 0 0;font-size:13px;color:#e2e8f0;word-break:break-all;">${esc(d.message)}</p>
+    </div>`;
+  });
+  dList.innerHTML=html;
+}
 
-$("editProfileBtn").onclick=()=>{$("editName").value=userProfile.name;$("editBranch").value=userProfile.branch;$("editSem").value=userProfile.sem;$("profileModal").classList.add("show")};
+$("search").addEventListener("input",renderBranches);
+$("year").textContent=new Date().getFullYear();
+renderBranches();
+renderSyllabusBranches();
+
+const sidebar=$("sidebar");
+$("menuBtn").onclick=()=>sidebar.classList.toggle("open");
+document.addEventListener("click",e=>{
+  if(innerWidth<=680&&sidebar.classList.contains("open")&&!sidebar.contains(e.target)&&e.target.id!=="menuBtn")sidebar.classList.remove("open");
+});
+$("exploreBtn").onclick=()=>$("library").scrollIntoView({behavior:"smooth"});
+$("googleHero").onclick=login;
+$("loginBtn").onclick=login;
+$("sideLogin").onclick=()=>user?logout():login();
+$("adminNav").onclick=()=>{
+  $("adminPanel").scrollIntoView({behavior:"smooth"});
+  if(!isAdmin())toast("Admin panel sirf owner Gmail (harshverma251309@gmail.com) ke liye hai.");
+};
+
+$("editProfileBtn").onclick=()=>{
+  $("editName").value=userProfile.name;
+  $("editBranch").value=userProfile.branch;
+  $("editSem").value=userProfile.sem;
+  $("profileModal").classList.add("show");
+};
 $("closeProfileModal").onclick=()=>$("profileModal").classList.remove("show");
-$("profileForm").onsubmit=e=>{e.preventDefault();userProfile.name=$("editName").value.trim();userProfile.branch=$("editBranch").value;userProfile.sem=$("editSem").value;updateAuth();$("profileModal").classList.remove("show");toast("Profile updated successfully!");};
+$("profileForm").onsubmit=e=>{
+  e.preventDefault();
+  userProfile.name=$("editName").value.trim();
+  userProfile.branch=$("editBranch").value;
+  userProfile.sem=$("editSem").value;
+  updateAuth();
+  $("profileModal").classList.remove("show");
+  toast("Profile updated successfully!");
+};
 
-document.querySelectorAll("[data-branch]").forEach(b=>b.onclick=()=>{selected={branch:b.dataset.branch,semester:null};$("search").value="";renderBranches();renderMaterial();$("library").scrollIntoView({behavior:"smooth"});sidebar.classList.remove("open")});
+document.querySelectorAll("[data-branch]").forEach(b=>b.onclick=()=>{
+  selected={branch:b.dataset.branch,semester:null};
+  $("search").value="";
+  renderBranches();
+  renderMaterial();
+  $("library").scrollIntoView({behavior:"smooth"});
+  sidebar.classList.remove("open");
+});
+
 document.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>{
   const nav=b.dataset.nav;
   if(nav==="home")$("home").scrollIntoView({behavior:"smooth"});
   else if(nav==="library")$("library").scrollIntoView({behavior:"smooth"});
   else if(nav==="syllabus")$("syllabusSection").scrollIntoView({behavior:"smooth"});
   else if(nav==="exams")$("examsSection").scrollIntoView({behavior:"smooth"});
-  sidebar.classList.remove("open")
+  else if(nav==="doubt")$("doubtSection").scrollIntoView({behavior:"smooth"});
+  sidebar.classList.remove("open");
 });
 
 $("fCategory").addEventListener("change",e=>{
   const cat=e.target.value;
   const subLabel=$("subLabel"),subDiv=$("subDiv"),typeDiv=$("typeDiv"),branchDiv=$("branchDiv"),urlField=$("fUrl");
-  if(cat==="notification"){branchDiv.style.display="none";subDiv.style.display="none";typeDiv.style.display="none";urlField.required=false;}
-  else if(cat==="syllabus"){branchDiv.style.display="block";subDiv.style.display="block";typeDiv.style.display="none";subLabel.textContent="Year Folder";urlField.required=true;
+  if(cat==="notification"){
+    branchDiv.style.display="none";subDiv.style.display="none";typeDiv.style.display="none";urlField.required=false;
+  }else if(cat==="syllabus"){
+    branchDiv.style.display="block";subDiv.style.display="block";typeDiv.style.display="none";subLabel.textContent="Year Folder";urlField.required=true;
     subDiv.querySelector("select").innerHTML=`<option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option>`;
-  }
-  else if(cat==="exam"){branchDiv.style.display="block";subDiv.style.display="block";typeDiv.style.display="none";subLabel.textContent="Semester";urlField.required=true;
+  }else if(cat==="exam"){
+    branchDiv.style.display="block";subDiv.style.display="block";typeDiv.style.display="none";subLabel.textContent="Semester";urlField.required=true;
     subDiv.querySelector("select").innerHTML=semesters.map((s,i)=>`<option value="${i+1}">${s}</option>`).join("");
-  }
-  else{branchDiv.style.display="block";subDiv.style.display="block";typeDiv.style.display="block";subLabel.textContent="Semester";urlField.required=true;
+  }else{
+    branchDiv.style.display="block";subDiv.style.display="block";typeDiv.style.display="block";subLabel.textContent="Semester";urlField.required=true;
     subDiv.querySelector("select").innerHTML=semesters.map((s,i)=>`<option value="${i+1}">${s}</option>`).join("");
   }
 });
 
-const legal={privacy:["Privacy Policy","<p>This site organizes educational resource links. Google sign-in is handled securely via Firebase.</p>"],terms:["Terms & Conditions","<p>Use the site lawfully and respect copyright.</p>"],about:["About Us","<p>Polytechnic Hub is a student-focused resource directory.</p>"],contact:["Contact Us","<p>Contact owner via email for support.</p>"],feedback:["Feedback","<p>Send your feedback to support.</p>"]};
-function showLegal(t){$("modalTitle").textContent=legal[t][0];$("modalBody").innerHTML=legal[t][1];$("modal").classList.add("show")}document.querySelectorAll("[data-legal]").forEach(b=>b.onclick=()=>showLegal(b.dataset.legal));$("closeModal").onclick=()=>$("modal").classList.remove("show");$("modal").onclick=e=>{if(e.target===$("modal"))$("modal").classList.remove("show")};
+const legal={
+  privacy:["Privacy Policy","<p>This site organizes educational resource links. Google sign-in is handled securely via Firebase.</p>"],
+  terms:["Terms & Conditions","<p>Use the site lawfully and respect copyright.</p>"],
+  about:["About Us","<p>Polytechnic Hub is a student-focused resource directory.</p>"],
+  contact:["Contact Us","<p>Contact owner via email for support.</p>"],
+  feedback:["Feedback","<p>Send your feedback to support.</p>"]
+};
+function showLegal(t){
+  $("modalTitle").textContent=legal[t][0];
+  $("modalBody").innerHTML=legal[t][1];
+  $("modal").classList.add("show");
+}
+document.querySelectorAll("[data-legal]").forEach(b=>b.onclick=()=>showLegal(b.dataset.legal));
+$("closeModal").onclick=()=>$("modal").classList.remove("show");
+$("modal").onclick=e=>{if(e.target===$("modal"))$("modal").classList.remove("show")};
 
-function isAdmin(){return !!user&&user.email&&user.email.toLowerCase()===ADMIN_EMAIL.toLowerCase()}
+function isAdmin(){
+  return !!user && user.email && user.email.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase().trim();
+}
+
 function updateAuth(){
-  const a=$("authArea");a.innerHTML="";
-  const b=document.createElement("button");b.className="btn "+(user?"secondary":"primary");b.textContent=user?(user.displayName||"Account"):"Sign in with Google";b.onclick=()=>user?toast("Signed in successfully."):login();a.appendChild(b);
-  $("adminPanel").classList.toggle("hidden",!isAdmin());
+  const a=$("authArea");
+  if(!a) return;
+  a.innerHTML="";
+  const b=document.createElement("button");
+  b.className="btn "+(user?"secondary":"primary");
+  b.textContent=user?(user.displayName||"Account"):"Sign in with Google";
+  b.onclick=()=>user?toast("Signed in successfully."):login();
+  a.appendChild(b);
+  
+  const adminP = $("adminPanel");
+  if(adminP) adminP.classList.toggle("hidden", !isAdmin());
   
   if(user){
     if(!userProfile.name) userProfile.name=user.displayName||"Student / User";
@@ -491,20 +676,121 @@ function updateAuth(){
   }
 }
 
-async function login(){if(!firebaseReady){toast("Google login setup pending. Check README.");return}try{const {GoogleAuthProvider,signInWithPopup}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");await signInWithPopup(auth,new GoogleAuthProvider())}catch(e){toast("Login error: "+e.message)}}
-async function logout(){if(auth){const {signOut}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");await signOut(auth)}}
+async function login(){
+  if(!firebaseReady){toast("Google login setup pending. Please provide valid firebase-config.json in your repository.");return;}
+  try{
+    const {GoogleAuthProvider,signInWithPopup}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+    await signInWithPopup(auth,new GoogleAuthProvider());
+  }catch(e){toast("Login error: "+e.message);}
+}
 
-async function setupFirebase(){try{const response=await fetch("firebase-config.json");if(!response.ok)return;const cfg=await response.json();if(!cfg.apiKey||String(cfg.apiKey).startsWith("PASTE_"))return;const amod=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"),authmod=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"),app=amod.initializeApp(cfg);auth=authmod.getAuth(app);await authmod.setPersistence(auth,authmod.browserLocalPersistence);const fm=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");db=fm.getFirestore(app);firebaseReady=true;authmod.onAuthStateChanged(authmod.getAuth(app),async u=>{user=u;updateAuth();await loadResources()});$("adminMessage").textContent="Firebase connected successfully. Owner recognized: "+ADMIN_EMAIL;}catch(e){console.warn("Firebase not configured",e)}}
+async function logout(){
+  if(auth){
+    const {signOut}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+    await signOut(auth);
+  }
+}
 
-async function loadResources(){if(!firebaseReady)return;try{const {collection,getDocs}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"),snap=await getDocs(collection(db,"resources"));resources=snap.docs.map(d=>d.data());renderMaterial();renderSyllabusContent();renderExams();renderNotifications()}catch(e){toast("Failed to load records from Firestore.")}}
+async function setupFirebase(){
+  try{
+    const response=await fetch("firebase-config.json");
+    if(!response.ok) return;
+    const cfg=await response.json();
+    if(!cfg.apiKey||String(cfg.apiKey).startsWith("PASTE_")) return;
+    const amod=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"),
+          authmod=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"),
+          app=amod.initializeApp(cfg);
+    auth=authmod.getAuth(app);
+    await authmod.setPersistence(auth,authmod.browserLocalPersistence);
+    const fm=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    db=fm.getFirestore(app);
+    firebaseReady=true;
+    
+    authmod.onAuthStateChanged(authmod.getAuth(app),async u=>{
+      user=u;
+      updateAuth();
+      await loadResources();
+      await loadDoubts();
+    });
+    const aMsg = $("adminMessage");
+    if(aMsg) aMsg.textContent="Firebase connected successfully. Owner recognized: "+ADMIN_EMAIL;
+  }catch(e){console.warn("Firebase not configured",e);}
+}
 
-$("resourceForm").addEventListener("submit",async e=>{e.preventDefault();if(!isAdmin()){toast("Sirf owner hi content add kar sakta hai.");return}if(!firebaseReady){toast("Pehle Firebase configure karo.");return}
-const category=$("fCategory").value,title=$("fTitle").value.trim(),url=$("fUrl").value.trim();
-let branch="",semester=1,type="notes",folderIdx=1;
-if(category!=="notification"){branch=$("fBranch").value;semester=Number($("fSub").value);}
-if(category==="resource"){type=$("fType").value;folderIdx=Number($("fFolderIdx").value);}
+async function loadResources(){
+  if(!firebaseReady) return;
+  try{
+    const {collection,getDocs}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"),
+          snap=await getDocs(collection(db,"resources"));
+    resources=snap.docs.map(d=>d.data());
+    renderMaterial();
+    renderSyllabusContent();
+    renderExams();
+    renderNotifications();
+  }catch(e){toast("Failed to load records from Firestore.");}
+}
 
-try{const {collection,addDoc,serverTimestamp}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");await addDoc(collection(db,"resources"),{category,branch,semester,type,folderIdx,title,url,createdAt:serverTimestamp(),createdBy:user.email});resources.push({category,branch,semester,type,folderIdx,title,url});renderMaterial();renderSyllabusContent();renderExams();renderNotifications();e.target.reset();toast("Successfully published!")}catch(err){toast("Publishing failed. Check Firestore rules.")}});setupFirebase();
+async function loadDoubts(){
+  if(!firebaseReady) return;
+  try{
+    const {collection,getDocs}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"),
+          snap=await getDocs(collection(db,"doubts"));
+    doubts=snap.docs.map(d=>d.data());
+    renderDoubts();
+  }catch(e){console.warn("Failed to load doubts",e);}
+}
+
+$("resourceForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  if(!isAdmin()){toast("Sirf owner (harshverma251309@gmail.com) hi content add kar sakta hai.");return;}
+  if(!firebaseReady){toast("Pehle Firebase configure karo.");return;}
+  
+  const category=$("fCategory").value,title=$("fTitle").value.trim(),url=$("fUrl").value.trim();
+  let branch="",semester=1,type="notes",folderIdx=1;
+  if(category!=="notification"){
+    branch=$("fBranch").value;
+    semester=Number($("fSub").value);
+  }
+  if(category==="resource"){
+    type=$("fType").value;
+    folderIdx=Number($("fFolderIdx").value);
+  }
+
+  try{
+    const {collection,addDoc,serverTimestamp}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    await addDoc(collection(db,"resources"),{category,branch,semester,type,folderIdx,title,url,createdAt:serverTimestamp(),createdBy:user.email});
+    resources.push({category,branch,semester,type,folderIdx,title,url});
+    renderMaterial();
+    renderSyllabusContent();
+    renderExams();
+    renderNotifications();
+    e.target.reset();
+    toast("Successfully published!");
+  }catch(err){toast("Publishing failed. Check Firestore rules.");}
+});
+
+$("doubtForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  if(!user){toast("Pehle Google se sign in karein tab doubt post karein.");return;}
+  if(!firebaseReady){toast("Firebase not connected.");return;}
+  
+  const title=$("doubtTitle").value.trim();
+  const message=$("doubtMsg").value.trim();
+  const authorName=userProfile.name||user.displayName||"Student";
+  const authorBranch=userProfile.branch;
+  const authorSem=userProfile.sem;
+
+  try{
+    const {collection,addDoc,serverTimestamp}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    await addDoc(collection(db,"doubts"),{title,message,authorName,authorBranch,authorSem,createdAt:serverTimestamp(),authorEmail:user.email});
+    doubts.push({title,message,authorName,authorBranch,authorSem});
+    renderDoubts();
+    e.target.reset();
+    toast("Doubt / Request submitted successfully!");
+  }catch(err){toast("Failed to submit doubt. Check Firestore rules.");}
+});
+
+setupFirebase();
 </script>
 </body>
 </html>
